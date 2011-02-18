@@ -99,11 +99,12 @@ module Wp
       if deploy_config?
         config = YAML.load_file("deploy.yaml") rescue nil
         ssh_user = config['ssh_user']
+        ssh_port = config['ssh_port']
         remote_root = config['remote_root']
         theme = config['theme']
         invoke "wp:styles:generate"
         say "*** Deploying the theme ***"
-        system "rsync -avz --delete . #{ssh_user}:#{remote_root}/wp-content/themes/#{theme}/"
+        system "rsync -avz --delete . --rsh='ssh -p#{ssh_port}' #{ssh_user}:#{remote_root}/wp-content/themes/#{theme}/"
       else
         say "\n!! Deploy not possible. A deploy config file is required."
         invoke "wp:generate:deploy_config"
@@ -114,10 +115,11 @@ module Wp
     def app
       if deploy_config?
         ssh_user = config['ssh_user']
+        ssh_port = config['ssh_port']
         remote_root = config['remote_root']
         invoke "wp:styles:generate"
         say "*** Deploying the app ***"
-        system "rsync -avz --delete . #{ssh_user}:#{remote_root}/"
+        system "rsync -avz --delete . --rsh='ssh -p#{ssh_port}' #{ssh_user}:#{remote_root}/"
       else
         say "\n!! Deploy not possible. A deploy config file is required."
         invoke "wp:generate:deploy_config"
@@ -139,7 +141,12 @@ module Wp
     desc "deploy_config", "Generates the deploy.yaml file"
     def deploy_config
       filename = "deploy.yaml"
-      config = {'ssh_user' => 'you@yourdomain.com', 'remote_root' => '~/domains/yourdomain.com/html', 'theme' => 'kubrick'}
+      config = {
+        'ssh_user' => 'you@yourdomain.com',
+        'ssh_port' => '',
+        'remote_root' => '~/domains/yourdomain.com/html',
+        'theme' => 'kubrick'
+      }
       File.open(filename, "w"){ |f| f.puts config.to_yaml }
       say "\nA #{filename} file was generated for you. Update this file's information for rsync deployment."
       say "File location: #{File.expand_path filename}"
