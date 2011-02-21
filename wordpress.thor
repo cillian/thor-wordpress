@@ -54,7 +54,7 @@ module Wp
       if compass?
         invoke :clear
         say "*** Generating styles ***"
-        system "compass"
+        system "compass compile"
       else
         say "\n!! Styles were not generated. Compass is not setup."
       end
@@ -74,7 +74,7 @@ module Wp
     def watch
       if compass?
         invoke "wp:styles:generate"
-        system "compass --watch"
+        system "compass watch"
       else
         say "\n!! Styles were not watched. Compass is not setup."
       end
@@ -83,7 +83,7 @@ module Wp
     private
     
     def compass?
-      %x[compass -v].length > 1 and File.exist?("config.rb")
+      %x[compass version].length > 1 and File.exist?("config.rb")
     end
 
   end
@@ -91,6 +91,7 @@ module Wp
   class Deploy < Thor
   
     default_task :theme
+    map "-p" => :plugin
     map "-t" => :theme
     map "-a" => :app
   
@@ -98,13 +99,21 @@ module Wp
     def theme
       if deploy_config?
         config = YAML.load_file("deploy.yaml") rescue nil
-        ssh_user = config['ssh_user']
-        ssh_port = config['ssh_port']
-        remote_root = config['remote_root']
-        theme = config['theme']
         invoke "wp:styles:generate"
         say "*** Deploying the theme ***"
-        system "rsync -avz --delete . --rsh='ssh -p#{ssh_port}' #{ssh_user}:#{remote_root}/wp-content/themes/#{theme}/"
+        system "rsync -avz --delete . --rsh='ssh -p#{config['ssh_port']}' #{config['ssh_user']}:#{config['remote_root']}/wp-content/themes/#{config['module_name']}/"
+      else
+        say "\n!! Deploy not possible. A deploy config file is required."
+        invoke "wp:generate:deploy_config"
+      end
+    end
+
+    desc "plugin", "Deploys the plugin"
+    def plugin
+      if deploy_config?
+        config = YAML.load_file("deploy.yaml") rescue nil
+        say "*** Deploying the plugin ***"
+        system "rsync -avz --delete . --rsh='ssh -p#{config['ssh_port']}' #{config['ssh_user']}:#{config['remote_root']}/wp-content/plugins/#{config['module_name']}/"
       else
         say "\n!! Deploy not possible. A deploy config file is required."
         invoke "wp:generate:deploy_config"
@@ -114,12 +123,10 @@ module Wp
     desc "app", "Deploys the app"
     def app
       if deploy_config?
-        ssh_user = config['ssh_user']
-        ssh_port = config['ssh_port']
-        remote_root = config['remote_root']
+        config = YAML.load_file("deploy.yaml") rescue nil
         invoke "wp:styles:generate"
         say "*** Deploying the app ***"
-        system "rsync -avz --delete . --rsh='ssh -p#{ssh_port}' #{ssh_user}:#{remote_root}/"
+        system "rsync -avz --delete . --rsh='ssh -p#{config['ssh_port']}' #{config['ssh_user']}:#{config['remote_root']}/"
       else
         say "\n!! Deploy not possible. A deploy config file is required."
         invoke "wp:generate:deploy_config"
@@ -145,7 +152,7 @@ module Wp
         'ssh_user' => 'you@yourdomain.com',
         'ssh_port' => '',
         'remote_root' => '~/domains/yourdomain.com/html',
-        'theme' => 'kubrick'
+        'module_name' => 'kubrick'
       }
       File.open(filename, "w"){ |f| f.puts config.to_yaml }
       say "\nA #{filename} file was generated for you. Update this file's information for rsync deployment."
